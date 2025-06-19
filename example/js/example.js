@@ -529,4 +529,49 @@ $(document).ready(function() {
   // This serialization format needs work
   // Load a simple rectangle room
   blueprint3d.model.loadSerialized('{"floorplan":{"corners":{"f90da5e3-9e0e-eba7-173d-eb0b071e838e":{"x":204.85099999999989,"y":289.052},"da026c08-d76a-a944-8e7b-096b752da9ed":{"x":672.2109999999999,"y":289.052},"4e3d65cb-54c0-0681-28bf-bddcc7bdb571":{"x":672.2109999999999,"y":-178.308},"71d4f128-ae80-3d58-9bd2-711c6ce6cdf2":{"x":204.85099999999989,"y":-178.308}},"walls":[{"corner1":"71d4f128-ae80-3d58-9bd2-711c6ce6cdf2","corner2":"f90da5e3-9e0e-eba7-173d-eb0b071e838e","frontTexture":{"url":"rooms/textures/wallmap.png","stretch":true,"scale":0},"backTexture":{"url":"rooms/textures/wallmap.png","stretch":true,"scale":0}},{"corner1":"f90da5e3-9e0e-eba7-173d-eb0b071e838e","corner2":"da026c08-d76a-a944-8e7b-096b752da9ed","frontTexture":{"url":"rooms/textures/wallmap.png","stretch":true,"scale":0},"backTexture":{"url":"rooms/textures/wallmap.png","stretch":true,"scale":0}},{"corner1":"da026c08-d76a-a944-8e7b-096b752da9ed","corner2":"4e3d65cb-54c0-0681-28bf-bddcc7bdb571","frontTexture":{"url":"rooms/textures/wallmap.png","stretch":true,"scale":0},"backTexture":{"url":"rooms/textures/wallmap.png","stretch":true,"scale":0}},{"corner1":"4e3d65cb-54c0-0681-28bf-bddcc7bdb571","corner2":"71d4f128-ae80-3d58-9bd2-711c6ce6cdf2","frontTexture":{"url":"rooms/textures/wallmap.png","stretch":true,"scale":0},"backTexture":{"url":"rooms/textures/wallmap.png","stretch":true,"scale":0}}],"wallTextures":[],"floorTextures":{},"newFloorTextures":{}},"items":[]}');
+
+  // Load the GLB model using the REAL Three.js r100 GLTFLoader
+  setTimeout(function() {
+    console.log('Loading GLB model with Three.js r100...');
+    console.log('THREE.GLTFLoader available:', typeof THREE.GLTFLoader !== 'undefined');
+    
+    if (typeof THREE.GLTFLoader === 'undefined') {
+      console.error('GLTFLoader not found! Make sure GLTFLoader.js is loaded.');
+      return;
+    }
+    
+    var loader = new THREE.GLTFLoader();
+    
+    // Load the GLB file - this will now actually parse the GLB format!
+    loader.load('model.glb', function(gltf) {
+      console.log('GLB model loaded successfully with real parser!', gltf);
+      
+      var model = gltf.scene;
+      
+      // Debug: Check the actual model contents
+      console.log('Model children count:', model.children.length);
+      console.log('Model visible:', model.visible);
+      console.log('Model bounding box:', model);
+          
+      // Position the model in the center of the scene
+      model.position.set(0, 0, 0); // Center, slightly elevated
+      model.scale.set(100, 100, 100); // Start with moderate scale
+      
+      // Ensure model visibility
+      model.visible = true;
+      
+      // Add to the correct blueprint3d scene
+      console.log('Adding real GLB model to blueprint3d.model.scene...');
+      blueprint3d.model.scene.add(model);
+      
+      console.log('Real GLB model loaded and positioned at:', model.position);
+      console.log('Scene now contains actual parsed GLB geometry!');
+      
+    }, function(progress) {
+      console.log('Loading progress:', (progress.loaded / progress.total * 100) + '%');
+    }, function(error) {
+      console.error('Error loading GLB model:', error);
+    });
+    
+  }, 1000); // Wait for scene initialization
 });
