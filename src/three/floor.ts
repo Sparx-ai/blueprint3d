@@ -29,8 +29,9 @@ module BP3D.Three {
 
     function buildFloor() {
       var textureSettings = scope.room.getTexture();
-      // setup texture
-      var floorTexture = THREE.ImageUtils.loadTexture(textureSettings.url);
+      // setup texture - use TextureLoader instead of deprecated ImageUtils
+      var textureLoader = new THREE.TextureLoader();
+      var floorTexture = textureLoader.load(textureSettings.url);
       floorTexture.wrapS = THREE.RepeatWrapping;
       floorTexture.wrapT = THREE.RepeatWrapping;
       floorTexture.repeat.set(1, 1);
@@ -81,23 +82,19 @@ module BP3D.Three {
       var shape = new THREE.Shape(points);
       var geometry = new THREE.ShapeGeometry(shape);
       var roof = new THREE.Mesh(geometry, roofMaterial);
-
       roof.rotation.set(Math.PI / 2, 0, 0);
       roof.position.y = 250;
       return roof;
     }
 
     this.addToScene = function () {
-      scene.add(floorPlane);
-      //scene.add(roofPlane);
-      // hack so we can do intersect testing
-      scene.add(room.floorPlane);
+      floorPlane && scene.add(floorPlane);
+      roofPlane && scene.add(roofPlane);
     }
 
     this.removeFromScene = function () {
-      scene.remove(floorPlane);
-      //scene.remove(roofPlane);
-      scene.remove(room.floorPlane);
+      floorPlane && scene.remove(floorPlane);
+      roofPlane && scene.remove(roofPlane);
     }
   }
 }

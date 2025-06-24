@@ -1,4 +1,3 @@
-
 /*
  * Camera Buttons
  */
@@ -301,7 +300,21 @@ var SideMenu = function(blueprint3d, floorplanControls, modalEffects) {
     }
 
     if (newState == scope.states.DEFAULT) {
-      blueprint3d.three.updateWindowSize();
+      // Small delay to ensure DOM updates visibility first
+      setTimeout(function() {
+        blueprint3d.three.updateWindowSize();
+        // Force canvas to fill the container
+        var canvas = $("#viewer canvas");
+        if (canvas.length > 0) {
+          var parent = $("#viewer");
+          canvas.attr('width', parent.width());
+          canvas.attr('height', parent.height());
+          canvas.css({
+            'width': '100%',
+            'height': '100%'
+          });
+        }
+      }, 10);
     }
  
     // set new state
@@ -319,7 +332,13 @@ var SideMenu = function(blueprint3d, floorplanControls, modalEffects) {
   function handleWindowResize() {
     $(".sidebar").height(window.innerHeight);
     $("#add-items").height(window.innerHeight);
-
+    
+    // Update 3D viewer size if it's the current state
+    if (currentState == scope.states.DEFAULT) {
+      setTimeout(function() {
+        blueprint3d.three.updateWindowSize();
+      }, 10);
+    }
   };
 
   // TODO: this doesn't really belong here
@@ -532,18 +551,18 @@ $(document).ready(function() {
 
   // Load the GLB model using the REAL Three.js r100 GLTFLoader
   setTimeout(function() {
-    console.log('Loading GLB model with Three.js r100...');
-    console.log('THREE.GLTFLoader available:', typeof THREE.GLTFLoader !== 'undefined');
+    console.log('Loading GLB model with Three.js {}...');
+    // console.log('THREE.GLTFLoader available:', typeof THREE.GLTFLoader !== 'undefined');
     
-    if (typeof THREE.GLTFLoader === 'undefined') {
-      console.error('GLTFLoader not found! Make sure GLTFLoader.js is loaded.');
-      return;
-    }
+    // if (typeof THREE.GLTFLoader === 'undefined') {
+    //   console.error('GLTFLoader not found! Make sure GLTFLoader.js is loaded.');
+    //   return;
+    // }
     
     var loader = new THREE.GLTFLoader();
     
     // Load the GLB file - this will now actually parse the GLB format!
-    loader.load('model.glb', function(gltf) {
+    loader.load('model2.glb', function(gltf) {
       console.log('GLB model loaded successfully with real parser!', gltf);
       
       var model = gltf.scene;
@@ -555,7 +574,7 @@ $(document).ready(function() {
           
       // Position the model in the center of the scene
       model.position.set(0, 0, 0); // Center, slightly elevated
-      model.scale.set(100, 100, 100); // Start with moderate scale
+      model.scale.set(1, 1, 1); // Start with moderate scale
       
       // Ensure model visibility
       model.visible = true;

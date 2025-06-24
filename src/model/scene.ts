@@ -18,8 +18,8 @@ module BP3D.Model {
     /** */
     public needsUpdate = false;
 
-    /** The Json loader. */
-    private loader: THREE.JSONLoader;
+    /** The GLTF loader (updated for r100). */
+    private loader: any; // THREE.GLTFLoader type not available in r69 definitions
 
     /** */
     private itemLoadingCallbacks = $.Callbacks();
@@ -38,22 +38,25 @@ module BP3D.Model {
     constructor(private model: Model, private textureDir: string) {
       this.scene = new THREE.Scene();
 
-      // init item loader
-      this.loader = new THREE.JSONLoader();
-      this.loader.crossOrigin = "";
+      // init item loader - use GLTFLoader for modern Three.js
+      if ((window as any).THREE && (window as any).THREE.GLTFLoader) {
+        this.loader = new (window as any).THREE.GLTFLoader();
+      } else {
+        console.warn("GLTFLoader not available, item loading may not work");
+      }
     }
 
     /** Adds a non-item, basically a mesh, to the scene.
      * @param mesh The mesh to be added.
      */
-    public add(mesh: THREE.Mesh) {
+    public add(mesh: THREE.Object3D) {
       this.scene.add(mesh);
     }
 
     /** Removes a non-item, basically a mesh, from the scene.
      * @param mesh The mesh to be removed.
      */
-    public remove(mesh: THREE.Mesh) {
+    public remove(mesh: THREE.Object3D) {
       this.scene.remove(mesh);
       Core.Utils.removeValue(this.items, mesh);
     }
@@ -118,26 +121,45 @@ module BP3D.Model {
     public addItem(itemType: number, fileName: string, metadata, position: THREE.Vector3, rotation: number, scale: THREE.Vector3, fixed: boolean) {
       itemType = itemType || 1;
       var scope = this;
-      var loaderCallback = function (geometry: THREE.Geometry, materials: THREE.Material[]) {
-        var item = new (Items.Factory.getClass(itemType))(
-          scope.model,
-          metadata, geometry,
-          new THREE.MeshFaceMaterial(materials),
-          position, rotation, scale
-        );
-        item.fixed = fixed || false;
-        scope.items.push(item);
-        scope.add(item);
-        item.initObject();
-        scope.itemLoadedCallbacks.fire(item);
+      
+      // Updated loader callback for GLTF format
+      var loaderCallback = function (gltf: any) {
+        // For GLTF files, extract the scene or first mesh
+        var geometry, material;
+        
+        if (gltf.scene) {
+          // Use the whole scene as geometry (modern approach)
+          var item = new (Items.Factory.getClass(itemType))(
+            scope.model,
+            metadata, 
+            gltf.scene, // Use the loaded scene directly
+            null, // Material is embedded in GLTF
+            position, rotation, scale
+          );
+          item.fixed = fixed || false;
+          scope.items.push(item);
+          scope.add(item);
+          item.initObject();
+          scope.itemLoadedCallbacks.fire(item);
+        } else {
+          console.warn("Loaded GLTF has no scene data");
+        }
       }
 
       this.itemLoadingCallbacks.fire();
-      this.loader.load(
-        fileName,
-        loaderCallback,
-        undefined // TODO_Ekki 
-      );
+      
+      if (this.loader && this.loader.load) {
+        this.loader.load(
+          fileName,
+          loaderCallback,
+          undefined, // progress callback
+          function(error) {
+            console.error("Error loading model:", error);
+          }
+        );
+      } else {
+        console.error("No loader available for loading items");
+      }
     }
   }
 }
