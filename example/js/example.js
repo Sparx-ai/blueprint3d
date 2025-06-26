@@ -1,8 +1,105 @@
+
+function convertStructureToBlueprint({ walls = [], windows = [] }, scaleFactor = 100, mergeThreshold = 0.1) {
+  const coordToUUID = {};  // "x,y" => UUID
+  const uuidToCoord = {};  // UUID => { x, y }
+  const wallSet = new Set();
+  const wallsOutput = [];
+  const itemsOutput = [];
+
+  function round(n) {
+    return parseFloat(n.toFixed(3));
+  }
+
+  function getCoordKey(x, y) {
+    return `${round(x)},${round(y)}`;
+  }
+
+  function findNearbyUUID(x, y) {
+    for (const [key, uuid] of Object.entries(coordToUUID)) {
+      const [cx, cy] = key.split(',').map(Number);
+      if (Math.abs(cx - x) < mergeThreshold && Math.abs(cy - y) < mergeThreshold) {
+        return uuid;
+      }
+    }
+    return null;
+  }
+
+  function processVertex(vertex) {
+    const x = round(vertex.x * scaleFactor);
+    const y = round(vertex.y * scaleFactor);
+    const key = getCoordKey(x, y);
+    let uuid = findNearbyUUID(x, y);
+    if (!uuid) {
+      uuid = crypto.randomUUID(); // use uuidv4() in Node
+      coordToUUID[key] = uuid;
+      uuidToCoord[uuid] = { x, y };
+    }
+    return uuid;
+  }
+
+  // === WALLS ===
+  for (const wall of walls) {
+    if (!wall.vertex1 || !wall.vertex2) continue;
+    const uuid1 = processVertex(wall.vertex1);
+    const uuid2 = processVertex(wall.vertex2);
+    if (uuid1 === uuid2) continue;
+
+    const wallKey = [uuid1, uuid2].sort().join('|');
+    if (wallSet.has(wallKey)) continue;
+
+    wallSet.add(wallKey);
+    wallsOutput.push({ corner1: uuid1, corner2: uuid2 });
+  }
+
+  // === WINDOWS ===
+  for (const window of windows) {
+    const v1 = window.windowLine?.vertex1;
+    const v2 = window.windowLine?.vertex2;
+    if (!v1 || !v2) continue;
+
+    const midX = ((v1.x + v2.x) / 2) * scaleFactor;
+    const midY = ((v1.y + v2.y) / 2) * scaleFactor;
+    const z = (window.bottomHeight || 0) * scaleFactor;
+
+
+  }
+
+  // === FINAL CORNER FILTERING ===
+  const usedCorners = new Set();
+  for (const wall of wallsOutput) {
+    usedCorners.add(wall.corner1);
+    usedCorners.add(wall.corner2);
+  }
+
+  const filteredCorners = {};
+  for (const uuid of usedCorners) {
+    filteredCorners[uuid] = uuidToCoord[uuid];
+  }
+
+  return {
+    floorplan: {
+      corners: filteredCorners,
+      walls: wallsOutput
+    },
+    items: itemsOutput
+  };
+}
 /*
  * Camera Buttons
  */
 
-var CameraButtons = function(blueprint3d) {
+async function generatePresignedUrl(objKey) {
+  const response = await fetch(`https://api.sparx.ai/api/resource/${objKey}`, {
+    headers: {
+      Authorization: 'xZRuBuykeDuRRei0lw0Oe5WJOXbwuRQK'
+    }
+  })
+  const data = await response.text()
+  return data
+}
+
+
+var CameraButtons = function (blueprint3d) {
 
   var orbitControls = blueprint3d.three.controls;
   var three = blueprint3d.three;
@@ -18,22 +115,22 @@ var CameraButtons = function(blueprint3d) {
   function init() {
     // Camera controls
     $("#zoom-in").click(zoomIn);
-    $("#zoom-out").click(zoomOut);  
+    $("#zoom-out").click(zoomOut);
     $("#zoom-in").dblclick(preventDefault);
     $("#zoom-out").dblclick(preventDefault);
 
     $("#reset-view").click(three.centerCamera)
 
-    $("#move-left").click(function(){
+    $("#move-left").click(function () {
       pan(directions.LEFT)
     })
-    $("#move-right").click(function(){
+    $("#move-right").click(function () {
       pan(directions.RIGHT)
     })
-    $("#move-up").click(function(){
+    $("#move-up").click(function () {
       pan(directions.UP)
     })
-    $("#move-down").click(function(){
+    $("#move-down").click(function () {
       pan(directions.DOWN)
     })
 
@@ -82,17 +179,17 @@ var CameraButtons = function(blueprint3d) {
 
 /*
  * Context menu for selected item
- */ 
+ */
 
-var ContextMenu = function(blueprint3d) {
+var ContextMenu = function (blueprint3d) {
 
   var scope = this;
   var selectedItem;
   var three = blueprint3d.three;
 
   function init() {
-    $("#context-menu-delete").click(function(event) {
-        selectedItem.remove();
+    $("#context-menu-delete").click(function (event) {
+      selectedItem.remove();
     });
 
     three.itemSelectedCallbacks.add(itemSelected);
@@ -100,9 +197,9 @@ var ContextMenu = function(blueprint3d) {
 
     initResize();
 
-    $("#fixed").click(function() {
-        var checked = $(this).prop('checked');
-        selectedItem.setFixed(checked);
+    $("#fixed").click(function () {
+      var checked = $(this).prop('checked');
+      selectedItem.setFixed(checked);
     });
   }
 
@@ -154,13 +251,13 @@ var ContextMenu = function(blueprint3d) {
  * Loading modal for items
  */
 
-var ModalEffects = function(blueprint3d) {
+var ModalEffects = function (blueprint3d) {
 
   var scope = this;
   var blueprint3d = blueprint3d;
   var itemsLoading = 0;
 
-  this.setActiveItem = function(active) {
+  this.setActiveItem = function (active) {
     itemSelected = active;
     update();
   }
@@ -174,15 +271,15 @@ var ModalEffects = function(blueprint3d) {
   }
 
   function init() {
-    blueprint3d.model.scene.itemLoadingCallbacks.add(function() {
+    blueprint3d.model.scene.itemLoadingCallbacks.add(function () {
       itemsLoading += 1;
       update();
     });
 
-     blueprint3d.model.scene.itemLoadedCallbacks.add(function() {
+    blueprint3d.model.scene.itemLoadedCallbacks.add(function () {
       itemsLoading -= 1;
       update();
-    });   
+    });
 
     update();
   }
@@ -194,7 +291,7 @@ var ModalEffects = function(blueprint3d) {
  * Side menu
  */
 
-var SideMenu = function(blueprint3d, floorplanControls, modalEffects) {
+var SideMenu = function (blueprint3d, floorplanControls, modalEffects) {
   var blueprint3d = blueprint3d;
   var floorplanControls = floorplanControls;
   var modalEffects = modalEffects;
@@ -202,26 +299,26 @@ var SideMenu = function(blueprint3d, floorplanControls, modalEffects) {
   var ACTIVE_CLASS = "active";
 
   var tabs = {
-    "FLOORPLAN" : $("#floorplan_tab"),
-    "SHOP" : $("#items_tab"),
-    "DESIGN" : $("#design_tab")
+    "FLOORPLAN": $("#floorplan_tab"),
+    "SHOP": $("#items_tab"),
+    "DESIGN": $("#design_tab")
   }
 
   var scope = this;
   this.stateChangeCallbacks = $.Callbacks();
 
   this.states = {
-    "DEFAULT" : {
-      "div" : $("#viewer"),
-      "tab" : tabs.DESIGN
+    "DEFAULT": {
+      "div": $("#viewer"),
+      "tab": tabs.DESIGN
     },
-    "FLOORPLAN" : {
-      "div" : $("#floorplanner"),
-      "tab" : tabs.FLOORPLAN
+    "FLOORPLAN": {
+      "div": $("#floorplanner"),
+      "tab": tabs.FLOORPLAN
     },
-    "SHOP" : {
-      "div" : $("#add-items"),
-      "tab" : tabs.SHOP
+    "SHOP": {
+      "div": $("#add-items"),
+      "tab": tabs.SHOP
     }
   }
 
@@ -251,7 +348,7 @@ var SideMenu = function(blueprint3d, floorplanControls, modalEffects) {
   }
 
   function tabClicked(tab) {
-    return function() {
+    return function () {
       // Stop three from spinning
       blueprint3d.three.stopSpin();
 
@@ -265,7 +362,7 @@ var SideMenu = function(blueprint3d, floorplanControls, modalEffects) {
       }
     }
   }
-  
+
   function setCurrentState(newState) {
 
     if (currentState == newState) {
@@ -275,7 +372,7 @@ var SideMenu = function(blueprint3d, floorplanControls, modalEffects) {
     // show the right tab as active
     if (currentState.tab !== newState.tab) {
       if (currentState.tab != null) {
-        currentState.tab.removeClass(ACTIVE_CLASS);          
+        currentState.tab.removeClass(ACTIVE_CLASS);
       }
       if (newState.tab != null) {
         newState.tab.addClass(ACTIVE_CLASS);
@@ -293,7 +390,7 @@ var SideMenu = function(blueprint3d, floorplanControls, modalEffects) {
     if (newState == scope.states.FLOORPLAN) {
       floorplanControls.updateFloorplanView();
       floorplanControls.handleWindowResize();
-    } 
+    }
 
     if (currentState == scope.states.FLOORPLAN) {
       blueprint3d.model.floorplan.update();
@@ -301,7 +398,7 @@ var SideMenu = function(blueprint3d, floorplanControls, modalEffects) {
 
     if (newState == scope.states.DEFAULT) {
       // Small delay to ensure DOM updates visibility first
-      setTimeout(function() {
+      setTimeout(function () {
         blueprint3d.three.updateWindowSize();
         // Force canvas to fill the container
         var canvas = $("#viewer canvas");
@@ -316,26 +413,26 @@ var SideMenu = function(blueprint3d, floorplanControls, modalEffects) {
         }
       }, 10);
     }
- 
+
     // set new state
-    handleWindowResize();    
+    handleWindowResize();
     currentState = newState;
 
     scope.stateChangeCallbacks.fire(newState);
   }
 
   function initLeftMenu() {
-    $( window ).resize( handleWindowResize );
+    $(window).resize(handleWindowResize);
     handleWindowResize();
   }
 
   function handleWindowResize() {
     $(".sidebar").height(window.innerHeight);
     $("#add-items").height(window.innerHeight);
-    
+
     // Update 3D viewer size if it's the current state
     if (currentState == scope.states.DEFAULT) {
-      setTimeout(function() {
+      setTimeout(function () {
         blueprint3d.three.updateWindowSize();
       }, 10);
     }
@@ -343,7 +440,7 @@ var SideMenu = function(blueprint3d, floorplanControls, modalEffects) {
 
   // TODO: this doesn't really belong here
   function initItems() {
-    $("#add-items").find(".add-item").mousedown(function(e) {
+    $("#add-items").find(".add-item").mousedown(function (e) {
       var modelUrl = $(this).attr("model-url");
       var itemType = parseInt($(this).attr("model-type"));
       var metadata = {
@@ -375,7 +472,7 @@ var TextureSelector = function (blueprint3d, sideMenu) {
   var currentTarget = null;
 
   function initTextureSelectors() {
-    $(".texture-select-thumbnail").click(function(e) {
+    $(".texture-select-thumbnail").click(function (e) {
       var textureUrl = $(this).attr("texture-url");
       var textureStretch = ($(this).attr("texture-stretch") == "true");
       var textureScale = parseInt($(this).attr("texture-scale"));
@@ -396,19 +493,19 @@ var TextureSelector = function (blueprint3d, sideMenu) {
 
   function wallClicked(halfEdge) {
     currentTarget = halfEdge;
-    $("#floorTexturesDiv").hide();  
-    $("#wallTextures").show();  
+    $("#floorTexturesDiv").hide();
+    $("#wallTextures").show();
   }
 
   function floorClicked(room) {
     currentTarget = room;
-    $("#wallTextures").hide();  
-    $("#floorTexturesDiv").show();  
+    $("#wallTextures").hide();
+    $("#floorTexturesDiv").show();
   }
 
   function reset() {
-    $("#wallTextures").hide();  
-    $("#floorTexturesDiv").hide();  
+    $("#wallTextures").hide();
+    $("#floorTexturesDiv").hide();
   }
 
   init();
@@ -418,7 +515,7 @@ var TextureSelector = function (blueprint3d, sideMenu) {
  * Floorplanner controls
  */
 
-var ViewerFloorplanner = function(blueprint3d) {
+var ViewerFloorplanner = function (blueprint3d) {
 
   var canvasWrapper = '#floorplanner';
 
@@ -435,20 +532,20 @@ var ViewerFloorplanner = function(blueprint3d) {
 
   function init() {
 
-    $( window ).resize( scope.handleWindowResize );
+    $(window).resize(scope.handleWindowResize);
     scope.handleWindowResize();
 
     // mode buttons
-    scope.floorplanner.modeResetCallbacks.add(function(mode) {
+    scope.floorplanner.modeResetCallbacks.add(function (mode) {
       $(draw).removeClass(activeStlye);
       $(remove).removeClass(activeStlye);
       $(move).removeClass(activeStlye);
       if (mode == BP3D.Floorplanner.floorplannerModes.MOVE) {
-          $(move).addClass(activeStlye);
+        $(move).addClass(activeStlye);
       } else if (mode == BP3D.Floorplanner.floorplannerModes.DRAW) {
-          $(draw).addClass(activeStlye);
+        $(draw).addClass(activeStlye);
       } else if (mode == BP3D.Floorplanner.floorplannerModes.DELETE) {
-          $(remove).addClass(activeStlye);
+        $(remove).addClass(activeStlye);
       }
 
       if (mode == BP3D.Floorplanner.floorplannerModes.DRAW) {
@@ -459,32 +556,32 @@ var ViewerFloorplanner = function(blueprint3d) {
       }
     });
 
-    $(move).click(function(){
+    $(move).click(function () {
       scope.floorplanner.setMode(BP3D.Floorplanner.floorplannerModes.MOVE);
     });
 
-    $(draw).click(function(){
+    $(draw).click(function () {
       scope.floorplanner.setMode(BP3D.Floorplanner.floorplannerModes.DRAW);
     });
 
-    $(remove).click(function(){
+    $(remove).click(function () {
       scope.floorplanner.setMode(BP3D.Floorplanner.floorplannerModes.DELETE);
     });
   }
 
-  this.updateFloorplanView = function() {
+  this.updateFloorplanView = function () {
     scope.floorplanner.reset();
   }
 
-  this.handleWindowResize = function() {
+  this.handleWindowResize = function () {
     $(canvasWrapper).height(window.innerHeight - $(canvasWrapper).offset().top);
     scope.floorplanner.resizeView();
   };
 
   init();
-}; 
+};
 
-var mainControls = function(blueprint3d) {
+var mainControls = function (blueprint3d) {
   var blueprint3d = blueprint3d;
 
   function newDesign() {
@@ -493,10 +590,10 @@ var mainControls = function(blueprint3d) {
 
   function loadDesign() {
     files = $("#loadFile").get(0).files;
-    var reader  = new FileReader();
-    reader.onload = function(event) {
-        var data = event.target.result;
-        blueprint3d.model.loadSerialized(data);
+    var reader = new FileReader();
+    reader.onload = function (event) {
+      var data = event.target.result;
+      blueprint3d.model.loadSerialized(data);
     }
     reader.readAsText(files[0]);
   }
@@ -504,7 +601,7 @@ var mainControls = function(blueprint3d) {
   function saveDesign() {
     var data = blueprint3d.model.exportSerialized();
     var a = window.document.createElement('a');
-    var blob = new Blob([data], {type : 'text'});
+    var blob = new Blob([data], { type: 'text' });
     a.href = window.URL.createObjectURL(blob);
     a.download = 'design.blueprint3d';
     document.body.appendChild(a)
@@ -525,7 +622,7 @@ var mainControls = function(blueprint3d) {
  * Initialize!
  */
 
-$(document).ready(function() {
+$(document).ready(function () {
 
   // main setup
   var opts = {
@@ -541,56 +638,115 @@ $(document).ready(function() {
   var viewerFloorplanner = new ViewerFloorplanner(blueprint3d);
   var contextMenu = new ContextMenu(blueprint3d);
   var sideMenu = new SideMenu(blueprint3d, viewerFloorplanner, modalEffects);
-  var textureSelector = new TextureSelector(blueprint3d, sideMenu);        
+  var textureSelector = new TextureSelector(blueprint3d, sideMenu);
   var cameraButtons = new CameraButtons(blueprint3d);
   mainControls(blueprint3d);
 
-  // This serialization format needs work
-  // Load a simple rectangle room
-  blueprint3d.model.loadSerialized('{"floorplan":{"corners":{"f90da5e3-9e0e-eba7-173d-eb0b071e838e":{"x":204.85099999999989,"y":289.052},"da026c08-d76a-a944-8e7b-096b752da9ed":{"x":672.2109999999999,"y":289.052},"4e3d65cb-54c0-0681-28bf-bddcc7bdb571":{"x":672.2109999999999,"y":-178.308},"71d4f128-ae80-3d58-9bd2-711c6ce6cdf2":{"x":204.85099999999989,"y":-178.308}},"walls":[{"corner1":"71d4f128-ae80-3d58-9bd2-711c6ce6cdf2","corner2":"f90da5e3-9e0e-eba7-173d-eb0b071e838e","frontTexture":{"url":"rooms/textures/wallmap.png","stretch":true,"scale":0},"backTexture":{"url":"rooms/textures/wallmap.png","stretch":true,"scale":0}},{"corner1":"f90da5e3-9e0e-eba7-173d-eb0b071e838e","corner2":"da026c08-d76a-a944-8e7b-096b752da9ed","frontTexture":{"url":"rooms/textures/wallmap.png","stretch":true,"scale":0},"backTexture":{"url":"rooms/textures/wallmap.png","stretch":true,"scale":0}},{"corner1":"da026c08-d76a-a944-8e7b-096b752da9ed","corner2":"4e3d65cb-54c0-0681-28bf-bddcc7bdb571","frontTexture":{"url":"rooms/textures/wallmap.png","stretch":true,"scale":0},"backTexture":{"url":"rooms/textures/wallmap.png","stretch":true,"scale":0}},{"corner1":"4e3d65cb-54c0-0681-28bf-bddcc7bdb571","corner2":"71d4f128-ae80-3d58-9bd2-711c6ce6cdf2","frontTexture":{"url":"rooms/textures/wallmap.png","stretch":true,"scale":0},"backTexture":{"url":"rooms/textures/wallmap.png","stretch":true,"scale":0}}],"wallTextures":[],"floorTextures":{},"newFloorTextures":{}},"items":[]}');
+  // Load sample floorplan from JSON file
+  fetch('/data/sample.json')
+    .then(response => response.json())
+    .then(data => {
+      blueprint3d.model.loadSerialized(JSON.stringify(convertStructureToBlueprint(data)));
+    })
+    .catch(error => {
+      console.error('Error loading sample floorplan:', error);
+    });
 
   // Load the GLB model using the REAL Three.js r100 GLTFLoader
-  setTimeout(function() {
+  setTimeout(function () {
     console.log('Loading GLB model with Three.js {}...');
+    // return
     // console.log('THREE.GLTFLoader available:', typeof THREE.GLTFLoader !== 'undefined');
-    
+
     // if (typeof THREE.GLTFLoader === 'undefined') {
     //   console.error('GLTFLoader not found! Make sure GLTFLoader.js is loaded.');
     //   return;
     // }
-    
-    var loader = new THREE.GLTFLoader();
-    
-    // Load the GLB file - this will now actually parse the GLB format!
-    loader.load('model2.glb', function(gltf) {
-      console.log('GLB model loaded successfully with real parser!', gltf);
-      
-      var model = gltf.scene;
-      
-      // Debug: Check the actual model contents
-      console.log('Model children count:', model.children.length);
-      console.log('Model visible:', model.visible);
-      console.log('Model bounding box:', model);
-          
-      // Position the model in the center of the scene
-      model.position.set(0, 0, 0); // Center, slightly elevated
-      model.scale.set(1, 1, 1); // Start with moderate scale
-      
-      // Ensure model visibility
-      model.visible = true;
-      
-      // Add to the correct blueprint3d scene
-      console.log('Adding real GLB model to blueprint3d.model.scene...');
-      blueprint3d.model.scene.add(model);
-      
-      console.log('Real GLB model loaded and positioned at:', model.position);
-      console.log('Scene now contains actual parsed GLB geometry!');
-      
-    }, function(progress) {
-      console.log('Loading progress:', (progress.loaded / progress.total * 100) + '%');
-    }, function(error) {
-      console.error('Error loading GLB model:', error);
-    });
-    
+
+    fetch('/data/specific.json')
+      .then(response => response.json())
+      .then(data => {
+        console.log('Designs data loaded:', data);
+
+        // const components = data.data.unit_types[0].unit_type_levels[0].rooms.map(r => r.room_designs).flat().filter(r => !!r.training_data).map(d => d.design_components).flat().filter(c => c.category === 'Asset')
+        const components = data.data.design_layouts[0].room_designs.map(d => d.design_components).flat().filter(c => c.category === 'Asset')
+        // const components = roomDesigns.map(r => r.design_components).flat().filter(c => c.category === 'Asset')
+
+        // console.log({ components })
+        for (const component of components) {
+          const key = component.assets[0].asset.models[0].high_res_model_path.replace(/\/([^\/]+)$/, '/glb/$1')
+
+          generatePresignedUrl(`${key}.glb`).then(data => {
+            console.log("link", data)
+
+            var loader = new THREE.GLTFLoader();
+
+            // Load the GLB file - this will now actually parse the GLB format!
+            loader.load(data, function (gltf) {
+              console.log('GLB model loaded successfully with real parser!', gltf);
+
+              var model = gltf.scene;
+
+              // Debug: Check the actual model contents
+              console.log('Model children count:', model.children.length);
+              console.log('Model visible:', model.visible);
+              console.log('Model bounding box:', model);
+              // Calculate normalized vectors
+              const origin = new THREE.Vector3(component.origin.x, component.origin.z, component.origin.y + 0.01);
+
+              const topPoint = new THREE.Vector3(component.top.x, component.top.z, component.top.y + 0.01);
+              const topVec = new THREE.Vector3().subVectors(topPoint, origin).normalize();
+
+              const frontPoint = new THREE.Vector3(component.front.x, component.front.z, component.front.y + 0.01);
+              const frontVec = new THREE.Vector3().subVectors(frontPoint, origin).normalize();
+              frontVec.negate(); // Negate to match Swift implementation
+
+              // Calculate right vector as cross product of top and front
+              const rightVec = new THREE.Vector3().crossVectors(topVec, frontVec);
+
+              // Create rotation matrix from orthonormal vectors
+              const rotMatrix = new THREE.Matrix4().makeBasis(rightVec, topVec, frontVec);
+              const quaternion = new THREE.Quaternion().setFromRotationMatrix(rotMatrix);
+
+              // Set position and rotation
+              model.position.copy(origin);
+              model.position.multiplyScalar(100); // Scale position
+              model.quaternion.copy(quaternion);
+
+              // Apply scale if present
+              const scale = component.scale || { x: 1, y: 1, z: 1 };
+              model.scale.set(scale.x, scale.y, scale.z); // Keep original scale order
+
+              // Ensure model visibility
+              model.visible = true;
+
+              // Add to the correct blueprint3d scene
+              console.log('Adding real GLB model to blueprint3d.model.scene...');
+              blueprint3d.model.scene.add(model);
+
+              console.log('Real GLB model loaded and positioned at:', model.position);
+              console.log('Scene now contains actual parsed GLB geometry!');
+
+            }, function (progress) {
+              console.log('Loading progress:', (progress.loaded / progress.total * 100) + '%');
+            }, function (error) {
+              console.error('Error loading GLB model:', error);
+            });
+
+
+          })
+        }
+
+        // generatePresignedUrl("new_models/cb2/glb/luca_Spider_marble_side_table_white.glb").then(data=>{
+        //   console.log("link", data)
+        //   console.log("link", data)
+        // })
+      })
+      .catch(error => {
+        console.error('Error loading designs:', error);
+      });
+
+
+
   }, 1000); // Wait for scene initialization
 });
