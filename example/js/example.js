@@ -1,5 +1,4 @@
-
-function convertStructureToBlueprint({ walls = [], windows = [] }, scaleFactor = 100, mergeThreshold = 0.1) {
+function convertStructureToBlueprint(rooms, scaleFactor = 100, mergeThreshold = 0.1) {
   const coordToUUID = {};  // "x,y" => UUID
   const uuidToCoord = {};  // UUID => { x, y }
   const wallSet = new Set();
@@ -25,43 +24,35 @@ function convertStructureToBlueprint({ walls = [], windows = [] }, scaleFactor =
   }
 
   function processVertex(vertex) {
-    const x = round(vertex.x * scaleFactor);
-    const y = round(vertex.y * scaleFactor);
+    const x = round(vertex.x);
+    const y = round(vertex.y);
     const key = getCoordKey(x, y);
     let uuid = findNearbyUUID(x, y);
     if (!uuid) {
-      uuid = crypto.randomUUID(); // use uuidv4() in Node
+      uuid = crypto.randomUUID();
       coordToUUID[key] = uuid;
       uuidToCoord[uuid] = { x, y };
     }
     return uuid;
   }
 
-  // === WALLS ===
-  for (const wall of walls) {
-    if (!wall.vertex1 || !wall.vertex2) continue;
-    const uuid1 = processVertex(wall.vertex1);
-    const uuid2 = processVertex(wall.vertex2);
-    if (uuid1 === uuid2) continue;
+  // Process room boundaries as walls
+  for (const room of rooms) {
+    for (const boundary of room.boundaries) {
+      const uuid1 = processVertex(boundary.vertex1);
+      const uuid2 = processVertex(boundary.vertex2);
+      if (uuid1 === uuid2) continue;
 
-    const wallKey = [uuid1, uuid2].sort().join('|');
-    if (wallSet.has(wallKey)) continue;
+      const wallKey = [uuid1, uuid2].sort().join('|');
+      if (wallSet.has(wallKey)) continue;
 
-    wallSet.add(wallKey);
-    wallsOutput.push({ corner1: uuid1, corner2: uuid2 });
-  }
-
-  // === WINDOWS ===
-  for (const window of windows) {
-    const v1 = window.windowLine?.vertex1;
-    const v2 = window.windowLine?.vertex2;
-    if (!v1 || !v2) continue;
-
-    const midX = ((v1.x + v2.x) / 2) * scaleFactor;
-    const midY = ((v1.y + v2.y) / 2) * scaleFactor;
-    const z = (window.bottomHeight || 0) * scaleFactor;
-
-
+      wallSet.add(wallKey);
+      wallsOutput.push({ 
+        corner1: uuid1, 
+        corner2: uuid2,
+        height: boundary.height * scaleFactor
+      });
+    }
   }
 
   // === FINAL CORNER FILTERING ===
@@ -691,6 +682,73 @@ $(document).ready(function () {
               console.log('Model children count:', model.children.length);
               console.log('Model visible:', model.visible);
               console.log('Model bounding box:', model);
+
+              // Enhanced texture and material handling for GLB models
+              model.traverse(function (child) {
+                if (child.isMesh) {
+                  console.log('Processing mesh:', child.name, child.material);
+                  
+                  // Handle materials and textures properly
+                  if (child.material) {
+                    // If it's an array of materials
+                    if (Array.isArray(child.material)) {
+                      child.material.forEach(material => {
+                        fixMaterialTextures(material);
+                      });
+                    } else {
+                      // Single material
+                      fixMaterialTextures(child.material);
+                    }
+                  }
+                  
+                  // Ensure proper rendering settings
+                  child.castShadow = true;
+                  child.receiveShadow = true;
+                }
+              });
+
+              // Function to fix material textures and encoding
+              function fixMaterialTextures(material) {
+                if (!material) return;
+                
+                // Set proper texture encoding for color textures
+                if (material.map) {
+                  material.map.encoding = THREE.sRGBEncoding;
+                  material.map.flipY = false; // GLB textures don't need flipping
+                }
+                
+                if (material.emissiveMap) {
+                  material.emissiveMap.encoding = THREE.sRGBEncoding;
+                  material.emissiveMap.flipY = false;
+                }
+                
+                // Keep data textures (non-color) in linear encoding
+                if (material.normalMap) {
+                  material.normalMap.encoding = THREE.LinearEncoding;
+                  material.normalMap.flipY = false;
+                }
+                
+                if (material.roughnessMap) {
+                  material.roughnessMap.encoding = THREE.LinearEncoding;
+                  material.roughnessMap.flipY = false;
+                }
+                
+                if (material.metalnessMap) {
+                  material.metalnessMap.encoding = THREE.LinearEncoding;
+                  material.metalnessMap.flipY = false;
+                }
+                
+                if (material.aoMap) {
+                  material.aoMap.encoding = THREE.LinearEncoding;
+                  material.aoMap.flipY = false;
+                }
+                
+                // Ensure material updates
+                material.needsUpdate = true;
+                
+                console.log('Fixed material textures for:', material.name || 'unnamed material');
+              }
+
               // Calculate normalized vectors
               const origin = new THREE.Vector3(component.origin.x, component.origin.z, component.origin.y + 0.01);
 

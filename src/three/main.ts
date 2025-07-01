@@ -2,7 +2,7 @@
 /// <reference path="../../lib/three.d.ts" />
 /// <reference path="../core/utils.ts" />
 /// <reference path="controller.ts" />
-/// <reference path="floorPlan.ts" />
+/// <reference path="floorplan.ts" />
 /// <reference path="lights.ts" />
 /// <reference path="skybox.ts" />
 /// <reference path="controls.ts" />
@@ -80,6 +80,16 @@ module BP3D.Three {
         preserveDrawingBuffer: true // required to support .toDataURL()
       });
       renderer.autoClear = false;
+      
+      // Color management for proper texture display
+      if ((renderer as any).outputEncoding !== undefined) {
+        (renderer as any).outputEncoding = (window as any).THREE.sRGBEncoding;
+      }
+      
+      // Enable gamma correction for older Three.js versions
+      if ((renderer as any).gammaOutput !== undefined) {
+        (renderer as any).gammaOutput = true;
+      }
       
       // Updated shadow map properties for Three.js r100
       renderer.shadowMap.enabled = true;

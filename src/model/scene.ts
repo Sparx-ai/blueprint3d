@@ -109,6 +109,56 @@ module BP3D.Model {
     }
 
     /**
+     * Function to fix material textures and encoding for GLB models
+     */
+    private fixMaterialTextures(material: any) {
+      if (!material) return;
+      
+      // Set proper texture encoding for color textures (sRGB)
+      if (material.map) {
+        material.map.encoding = (window as any).THREE.sRGBEncoding;
+        material.map.flipY = false; // GLB textures don't need flipping
+        material.map.needsUpdate = true;
+      }
+      
+      if (material.emissiveMap) {
+        material.emissiveMap.encoding = (window as any).THREE.sRGBEncoding;
+        material.emissiveMap.flipY = false;
+        material.emissiveMap.needsUpdate = true;
+      }
+      
+      // Keep data textures (non-color) in linear encoding
+      if (material.normalMap) {
+        material.normalMap.encoding = (window as any).THREE.LinearEncoding;
+        material.normalMap.flipY = false;
+        material.normalMap.needsUpdate = true;
+      }
+      
+      if (material.roughnessMap) {
+        material.roughnessMap.encoding = (window as any).THREE.LinearEncoding;
+        material.roughnessMap.flipY = false;
+        material.roughnessMap.needsUpdate = true;
+      }
+      
+      if (material.metalnessMap) {
+        material.metalnessMap.encoding = (window as any).THREE.LinearEncoding;
+        material.metalnessMap.flipY = false;
+        material.metalnessMap.needsUpdate = true;
+      }
+      
+      if (material.aoMap) {
+        material.aoMap.encoding = (window as any).THREE.LinearEncoding;
+        material.aoMap.flipY = false;
+        material.aoMap.needsUpdate = true;
+      }
+      
+      // Ensure material updates
+      material.needsUpdate = true;
+      
+      console.log('Fixed material textures for GLB item:', material.name || 'unnamed material');
+    }
+
+    /**
      * Creates an item and adds it to the scene.
      * @param itemType The type of the item given by an enumerator.
      * @param fileName The name of the file to load.
@@ -128,6 +178,32 @@ module BP3D.Model {
         var geometry, material;
         
         if (gltf.scene) {
+          // Enhanced material and texture handling for GLB models
+          gltf.scene.traverse(function (child: any) {
+            if (child.isMesh) {
+              console.log('Processing GLB mesh:', child.name, child.material);
+              
+              // Handle materials and textures properly
+              if (child.material) {
+                // If it's an array of materials
+                if (Array.isArray(child.material)) {
+                  child.material.forEach((mat: any) => {
+                    scope.fixMaterialTextures(mat);
+                  });
+                } else {
+                  // Single material
+                  scope.fixMaterialTextures(child.material);
+                }
+              }
+              
+              // Ensure proper rendering settings
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
+          });
+
+
+
           // Use the whole scene as geometry (modern approach)
           var item = new (Items.Factory.getClass(itemType))(
             scope.model,

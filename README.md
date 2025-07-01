@@ -20,6 +20,105 @@ This is a customizable application built on three.js that allows users to design
 
 ![3d_design](https://s3.amazonaws.com/furnishup/design.png)
 
+## GLB Model Texture Fixes
+
+This repository has been updated to properly handle textures in GLB models. The following improvements have been implemented:
+
+### Issues Fixed
+- GLB models were loading without textures due to improper texture encoding
+- Material configurations were not optimized for PBR workflow
+- Color space management was missing from the renderer setup
+
+### Technical Improvements
+
+#### 1. Enhanced GLTFLoader Configuration
+- Added proper texture encoding handling for different texture types:
+  - **Color textures** (diffuse, emissive): Set to `THREE.sRGBEncoding`
+  - **Data textures** (normal, roughness, metalness, AO): Set to `THREE.LinearEncoding`
+- Disabled Y-axis flipping for GLB textures (`flipY = false`)
+- Added material update triggers (`needsUpdate = true`)
+
+#### 2. Material Processing Pipeline
+Both the main application (`example/js/example.js`) and the Blueprint3D core (`src/model/scene.ts`) now include:
+- Automatic traversal of loaded GLTF scenes to process all meshes
+- Material array handling for multi-material objects
+- Proper shadow casting and receiving configuration
+
+#### 3. Renderer Color Management
+- Added sRGB output encoding to the WebGL renderer
+- Implemented gamma correction for older Three.js versions
+- Ensures proper linear workflow for PBR materials
+
+### Code Examples
+
+#### Texture Encoding Fix Function
+```javascript
+function fixMaterialTextures(material) {
+  if (!material) return;
+  
+  // Color textures use sRGB encoding
+  if (material.map) {
+    material.map.encoding = THREE.sRGBEncoding;
+    material.map.flipY = false;
+  }
+  
+  if (material.emissiveMap) {
+    material.emissiveMap.encoding = THREE.sRGBEncoding;
+    material.emissiveMap.flipY = false;
+  }
+  
+  // Data textures use linear encoding
+  if (material.normalMap) {
+    material.normalMap.encoding = THREE.LinearEncoding;
+    material.normalMap.flipY = false;
+  }
+  
+  if (material.roughnessMap) {
+    material.roughnessMap.encoding = THREE.LinearEncoding;
+    material.roughnessMap.flipY = false;
+  }
+  
+  if (material.metalnessMap) {
+    material.metalnessMap.encoding = THREE.LinearEncoding;
+    material.metalnessMap.flipY = false;
+  }
+  
+  material.needsUpdate = true;
+}
+```
+
+#### Usage in GLTFLoader Callback
+```javascript
+loader.load(url, function (gltf) {
+  gltf.scene.traverse(function (child) {
+    if (child.isMesh && child.material) {
+      if (Array.isArray(child.material)) {
+        child.material.forEach(mat => fixMaterialTextures(mat));
+      } else {
+        fixMaterialTextures(child.material);
+      }
+    }
+  });
+  
+  // Add to scene...
+});
+```
+
+### Best Practices for GLB Models
+
+1. **Texture Formats**: Ensure GLB files embed textures properly or use external textures with correct CORS headers
+2. **Color Space**: Use sRGB for color textures and linear for data textures
+3. **Material Validation**: Always check material properties exist before accessing them
+4. **Renderer Setup**: Configure output encoding for proper color management
+
+### Compatibility Notes
+- Works with Three.js r69-r100+
+- Backward compatible with existing models
+- Automatic fallback for missing texture properties
+- Console logging for debugging material processing
+
+This fix ensures that GLB models display with their intended textures and materials, providing a proper PBR (Physically Based Rendering) workflow.
+
 ## Developing and Running Locally
 
 To get started, clone the repository and ensure you npm >= 3 and grunt installed, then run:

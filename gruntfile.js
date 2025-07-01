@@ -25,17 +25,18 @@ module.exports = function (grunt) {
     dest: globalConfig.exampleDir + "/three.min.js"
   }
 
-  configuration.typescript = {
+  configuration.ts = {
     options: {
       target: "es5",
+      module: "amd",
       declaration: true,
       sourceMap: true,
-      removeComments: false
+      removeComments: false,
+      outFile: globalConfig.outDir + "/" + globalConfig.moduleName + ".js"
+    },
+    default: {
+      src: globalConfig.sources
     }
-  };
-  configuration.typescript[globalConfig.moduleName] = {
-    src: globalConfig.sources,
-    dest: globalConfig.outDir + "/" + globalConfig.moduleName + ".js"
   };
 
   configuration.typedoc = {
@@ -69,7 +70,7 @@ module.exports = function (grunt) {
   grunt.initConfig(configuration);
 
   grunt.registerTask("debug", [
-    "typescript:" + globalConfig.moduleName
+    "ts:default"
   ]);
 
   grunt.registerTask("example", [
