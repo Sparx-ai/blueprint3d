@@ -1,10 +1,33 @@
-function convertStructureToBlueprint(rooms, scaleFactor = 100, mergeThreshold = 0.1) {
+// 🎯 SHARED BACKEND SCALE FACTOR
+// Backend: pixels_to_meters_ratio = 34.44444444444444
+// This means: 1 pixel = 2.903 cm
+const PIXELS_TO_METERS_RATIO = 34.44444444444444;
+const CM_PER_PIXEL = (1 / PIXELS_TO_METERS_RATIO) * 100; // 2.903 cm per pixel
+
+// 🎯 BACKEND COORDINATE CONVERSION  
+// Using same shared scale factor as room vertices for perfect consistency
+// GLB models: in centimeters → convert to pixels using backend ratio
+// Conversion: cm to pixels = cm ÷ CM_PER_PIXEL
+
+const glbToBlueprintScale = 1; // Convert cm to pixels (0.344444)
+
+// 🎯 STEP 2: Scale vertices around center
+function scaleAroundCenter(vertex, center, scaleFactor) {
+  return {
+    x: center.x + (vertex.x - center.x) * scaleFactor,
+    y: center.y + (vertex.y - center.y) * scaleFactor
+  };
+}
+
+function convertStructureToBlueprint(rooms, scaleFactor = 1, mergeThreshold = 0.1) {
   const coordToUUID = {};  // "x,y" => UUID
   const uuidToCoord = {};  // UUID => { x, y }
   const wallSet = new Set();
   const wallsOutput = [];
   const itemsOutput = [];
 
+  console.log("File updated - timestamp: " + new Date());
+  
   function round(n) {
     return parseFloat(n.toFixed(3));
   }
@@ -36,21 +59,57 @@ function convertStructureToBlueprint(rooms, scaleFactor = 100, mergeThreshold = 
     return uuid;
   }
 
-  // Process room boundaries as walls
-  for (const room of rooms) {
+  // Using shared backend coordinate conversion factor
+  
+  // 🎯 STEP 1: Calculate center of all vertices BEFORE scaling
+  const allVertices = [];
+  const roomsArray = Array.isArray(rooms) ? rooms : [rooms];
+  
+  // Collect all unique vertices
+  for (const room of roomsArray) {
     for (const boundary of room.boundaries) {
-      const uuid1 = processVertex(boundary.vertex1);
-      const uuid2 = processVertex(boundary.vertex2);
+      allVertices.push(boundary.vertex1, boundary.vertex2);
+    }
+  }
+  
+  // Find center (centroid)
+  const center = {
+    x: allVertices.reduce((sum, v) => sum + v.x, 0) / allVertices.length,
+    y: allVertices.reduce((sum, v) => sum + v.y, 0) / allVertices.length
+  };
+  
+  console.log(`🎯 Original center: (${center.x.toFixed(1)}, ${center.y.toFixed(1)})`);
+  console.log(`📏 Scale factor: ${CM_PER_PIXEL.toFixed(3)} cm per pixel`);
+  
+  // Process room boundaries as walls
+  for (const room of roomsArray) {
+    for (const boundary of room.boundaries) {
+      // Scale vertices around center (preserves room position)
+      const scaledVertex1 = scaleAroundCenter(boundary.vertex1, center, CM_PER_PIXEL);
+      const scaledVertex2 = scaleAroundCenter(boundary.vertex2, center, CM_PER_PIXEL);
+
+      const uuid1 = processVertex(scaledVertex1);
+      const uuid2 = processVertex(scaledVertex2);
       if (uuid1 === uuid2) continue;
 
       const wallKey = [uuid1, uuid2].sort().join('|');
       if (wallSet.has(wallKey)) continue;
 
+      // Calculate wall length
+      const coord1 = uuidToCoord[uuid1];
+      const coord2 = uuidToCoord[uuid2];
+      const length = Math.sqrt(
+        Math.pow(coord2.x - coord1.x, 2) + 
+        Math.pow(coord2.y - coord1.y, 2)
+      );
+      console.log(`Wall length (${uuid1} to ${uuid2}): ${round(length)} cm`);
+
       wallSet.add(wallKey);
       wallsOutput.push({ 
         corner1: uuid1, 
         corner2: uuid2,
-        height: boundary.height * scaleFactor
+        height: 275, // hard coded height
+        length: round(length) // Add calculated length in cm
       });
     }
   }
@@ -66,6 +125,24 @@ function convertStructureToBlueprint(rooms, scaleFactor = 100, mergeThreshold = 
   for (const uuid of usedCorners) {
     filteredCorners[uuid] = uuidToCoord[uuid];
   }
+
+  // 🎯 STEP 3: Verify center preservation
+  const scaledVertices = [];
+  for (const room of roomsArray) {
+    for (const boundary of room.boundaries) {
+      const scaledVertex1 = scaleAroundCenter(boundary.vertex1, center, CM_PER_PIXEL);
+      const scaledVertex2 = scaleAroundCenter(boundary.vertex2, center, CM_PER_PIXEL);
+      scaledVertices.push(scaledVertex1, scaledVertex2);
+    }
+  }
+  
+  const newCenter = {
+    x: scaledVertices.reduce((sum, v) => sum + v.x, 0) / scaledVertices.length,
+    y: scaledVertices.reduce((sum, v) => sum + v.y, 0) / scaledVertices.length
+  };
+  
+  console.log(`✅ Scaled center: (${newCenter.x.toFixed(1)}, ${newCenter.y.toFixed(1)})`);
+  console.log(`📏 Center preserved: ${Math.abs(newCenter.x - center.x) < 0.01 && Math.abs(newCenter.y - center.y) < 0.01 ? 'YES' : 'NO'}`);
 
   return {
     floorplan: {
@@ -645,166 +722,310 @@ $(document).ready(function () {
 
   // Load the GLB model using the REAL Three.js r100 GLTFLoader
   setTimeout(function () {
-    console.log('Loading GLB model with Three.js {}...');
-    // return
+    console.log('Loading LOCAL GLB model with Three.js r100...');
+    
+    // Test with a local GLB file to avoid CORS issues
+    // loadLocalGLBModel();
+    
+    // DISABLED: External GLB loading to avoid CORS errors in development
+    loadExternalGLBModels();
+  }, 1000); // Wait for scene initialization
+
+  // Function to load local GLB models (no CORS issues)
+  function loadLocalGLBModel() {
+    console.log('THREE.GLTFLoader available:', typeof THREE.GLTFLoader !== 'undefined');
+
+    if (typeof THREE.GLTFLoader === 'undefined') {
+      console.error('GLTFLoader not found! Make sure GLTFLoader.js is loaded.');
+      return;
+    }
+
+    var loader = new THREE.GLTFLoader();
+    
+    // Load a local GLB file (you can change this path)
+    const localGLBPath = '/glb/new_models_wayfair_glb_arena_table_lamp.glb'; // Example local file
+    
+    loader.load(localGLBPath, function (gltf) {
+      console.log('LOCAL GLB model loaded successfully!', gltf);
+
+      var model = gltf.scene;
+
+      // Debug: Check the actual model contents
+      console.log('Model children count:', model.children.length);
+      console.log('Model visible:', model.visible);
+
+      // Enhanced texture and material handling for GLB models
+      model.traverse(function (child) {
+        if (child.isMesh) {
+          console.log('Processing mesh:', child.name, child.material);
+          
+          if (child.material) {
+            if (Array.isArray(child.material)) {
+              child.material.forEach(material => {
+                fixMaterialTextures(material);
+              });
+            } else {
+              fixMaterialTextures(child.material);
+            }
+          }
+          
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+
+      // Function to fix material textures and encoding
+      function fixMaterialTextures(material) {
+        if (!material) return;
+        
+        if (material.map) {
+          material.map.encoding = THREE.sRGBEncoding;
+          material.map.flipY = false;
+        }
+        
+        if (material.emissiveMap) {
+          material.emissiveMap.encoding = THREE.sRGBEncoding;
+          material.emissiveMap.flipY = false;
+        }
+        
+        if (material.normalMap) {
+          material.normalMap.encoding = THREE.LinearEncoding;
+          material.normalMap.flipY = false;
+        }
+        
+        if (material.roughnessMap) {
+          material.roughnessMap.encoding = THREE.LinearEncoding;
+          material.roughnessMap.flipY = false;
+        }
+        
+        if (material.metalnessMap) {
+          material.metalnessMap.encoding = THREE.LinearEncoding;
+          material.metalnessMap.flipY = false;
+        }
+        
+        if (material.aoMap) {
+          material.aoMap.encoding = THREE.LinearEncoding;
+          material.aoMap.flipY = false;
+        }
+        
+        material.needsUpdate = true;
+        console.log('Fixed material textures for:', material.name || 'unnamed material');
+      }
+
+      // Position the model in the scene
+      model.position.set(0, 0, 50); // Adjust position as needed
+      model.scale.set(10, 10, 10);  // Scale up if too small
+      model.visible = true;
+
+      // Add to the blueprint3d scene
+      console.log('Adding LOCAL GLB model to blueprint3d.model.scene...');
+      blueprint3d.model.scene.add(model);
+
+      console.log('LOCAL GLB model loaded and positioned at:', model.position);
+      console.log('Scene now contains local GLB geometry - no CORS errors!');
+
+    }, function (progress) {
+      console.log('Loading progress:', (progress.loaded / progress.total * 100) + '%');
+    }, function (error) {
+      console.error('Error loading LOCAL GLB model:', error);
+    });
+  }
+
+  function positionModel(model, component, name, roomCenter) {
+      // 🎯 COORDINATE SYSTEM CONVERSION
+      // Component coordinates → Three.js coordinates
+      // component.x → Three.js X (right)
+      // component.y → Three.js Z (forward/back) 
+      // component.z → Three.js Y (up)
+      
+      const origin = new THREE.Vector3(
+        component.origin.x, 
+        component.origin.z, 
+        component.origin.y
+      );
+
+      const topPoint = new THREE.Vector3(
+        component.top.x, 
+        component.top.z, 
+        component.top.y
+      );
+      
+      const frontPoint = new THREE.Vector3(
+        component.front.x, 
+        component.front.z, 
+        component.front.y
+      );
+
+      // 🎯 CORRECT VECTOR CALCULATION
+      // Calculate direction vectors
+      const upVec = new THREE.Vector3().subVectors(topPoint, origin).normalize();
+      const forwardVec = new THREE.Vector3().subVectors(frontPoint, origin).normalize();
+      
+      // Calculate right vector (cross product: forward × up = right)
+      const rightVec = new THREE.Vector3().crossVectors(forwardVec, upVec).normalize();
+      
+      // Recalculate forward to ensure orthogonality (up × right = forward)
+      const correctedForwardVec = new THREE.Vector3().crossVectors(upVec, rightVec).normalize();
+
+      // 🎯 THREE.JS ROTATION MATRIX
+      // Three.js expects: X=right, Y=up, Z=forward
+      const rotMatrix = new THREE.Matrix4().makeBasis(rightVec, upVec, correctedForwardVec);
+      const quaternion = new THREE.Quaternion().setFromRotationMatrix(rotMatrix);
+
+      // 🎯 CENTER-PRESERVING MODEL POSITIONING
+      // Apply the same scaling transformation as room boundaries
+      // Use the same scaleAroundCenter function with calculated room center
+      
+      // Use the room center calculated from component positions
+      const useRoomCenter = roomCenter || { x: 0, y: 0 }; // Fallback to origin if not provided
+      
+      // Apply center-preserving scaling to model position (X-Z plane)
+      const scaledPos2D = scaleAroundCenter(
+        { x: component.origin.x, y: component.origin.y }, 
+        useRoomCenter, 
+        CM_PER_PIXEL
+      );
+      
+      const scaledOrigin = new THREE.Vector3(
+        scaledPos2D.x,
+        component.origin.z * CM_PER_PIXEL, // Y coordinate (height) - simple scaling
+        scaledPos2D.y
+      );
+      
+      console.log(`📍 Model positioning for ${name}:`, {
+        originalPos: {x: component.origin.x.toFixed(1), y: component.origin.y.toFixed(1), z: component.origin.z.toFixed(1)},
+        scaledPos: {x: scaledOrigin.x.toFixed(1), y: scaledOrigin.y.toFixed(1), z: scaledOrigin.z.toFixed(1)},
+        roomCenter: useRoomCenter,
+        scaleFactor: CM_PER_PIXEL.toFixed(3)
+      });
+      
+      // Set position and rotation
+      model.position.copy(scaledOrigin);
+      model.quaternion.copy(quaternion);
+      
+      // Debug: Log rotation vectors
+      console.log(`🧭 Rotation vectors for ${name}:`, {
+        right: {x: rightVec.x.toFixed(3), y: rightVec.y.toFixed(3), z: rightVec.z.toFixed(3)},
+        up: {x: upVec.x.toFixed(3), y: upVec.y.toFixed(3), z: upVec.z.toFixed(3)},
+        forward: {x: correctedForwardVec.x.toFixed(3), y: correctedForwardVec.y.toFixed(3), z: correctedForwardVec.z.toFixed(3)}
+      });
+      
+      // Log model size
+      const box = new THREE.Box3().setFromObject(model);
+      const size2 = box.getSize(new THREE.Vector3());
+      console.log('Model size:', {
+        name: name || 'unnamed model',
+        width: size2.z.toFixed(2),
+        height: size2.x.toFixed(2), 
+        depth: size2.y.toFixed(2)
+      });
+      // Log component details
+      console.log('Component details:', {
+        origin: component.origin,
+        top: component.top,
+        front: component.front,
+        scale: component.scale || { x: 1, y: 1, z: 1 }
+      });
+      // Apply component scale factor
+      const componentScale = component.scale || { x: 1, y: 1, z: 1 };
+      
+      // 📏 PRECISE SCALING CALCULATION
+      const finalScale = {
+        x: componentScale.x * glbToBlueprintScale,
+        y: componentScale.y * glbToBlueprintScale, 
+        z: componentScale.z * glbToBlueprintScale
+      };
+      
+      model.scale.set(finalScale.x, finalScale.y, finalScale.z);
+      
+      // Get final size after scaling  
+      const scaledBox = new THREE.Box3().setFromObject(model);
+      const finalSize = scaledBox.getSize(new THREE.Vector3());
+      
+      console.log('📊 BACKEND SCALING (CONSISTENT WITH ROOM SCALING):', {
+        assetId: component.sparxAssetId,
+        originalSize_cm: {x: size2.x.toFixed(1), y: size2.y.toFixed(1), z: size2.z.toFixed(1)},
+        sharedBackendRatio: `${PIXELS_TO_METERS_RATIO} pixels/meter`,
+        pixelPerCm: `1 pixel = ${CM_PER_PIXEL.toFixed(3)} cm`,
+        conversionFactor: `1 cm = ${glbToBlueprintScale.toFixed(6)} pixels`,
+        componentScale: componentScale,
+        finalScale: {x: finalScale.x.toFixed(6), y: finalScale.y.toFixed(6), z: finalScale.z.toFixed(6)},
+        finalSize_pixels: {x: finalSize.x.toFixed(1), y: finalSize.y.toFixed(1), z: finalSize.z.toFixed(1)},
+        finalSize_cm: {x: (finalSize.x * CM_PER_PIXEL).toFixed(1), y: (finalSize.y * CM_PER_PIXEL).toFixed(1), z: (finalSize.z * CM_PER_PIXEL).toFixed(1)}
+      });
+  }
+
+  // Function to load external GLB models (currently disabled due to CORS)
+  function loadExternalGLBModels() {
     // console.log('THREE.GLTFLoader available:', typeof THREE.GLTFLoader !== 'undefined');
 
     // if (typeof THREE.GLTFLoader === 'undefined') {
     //   console.error('GLTFLoader not found! Make sure GLTFLoader.js is loaded.');
     //   return;
     // }
+    var loader = new THREE.GLTFLoader();
 
     fetch('/data/specific.json')
       .then(response => response.json())
       .then(data => {
         console.log('Designs data loaded:', data);
+        console.log('Number of design layouts:', data.data.design_layouts.length);
 
-        // const components = data.data.unit_types[0].unit_type_levels[0].rooms.map(r => r.room_designs).flat().filter(r => !!r.training_data).map(d => d.design_components).flat().filter(c => c.category === 'Asset')
-        const components = data.data.design_layouts[0].room_designs.map(d => d.design_components).flat().filter(c => c.category === 'Asset')
-        // const components = roomDesigns.map(r => r.design_components).flat().filter(c => c.category === 'Asset')
+        console.log('Extracting components from design data...');
+        const components = data.data.design_layouts[0].room_designs.map(d => d.design_components).flat().filter(c => c.sparxCategory === 'Asset')
+        console.log('Found components:', components.length);
+        console.log('Component details:', components);
 
-        // console.log({ components })
+        // 🎯 CALCULATE ROOM CENTER FROM COMPONENT POSITIONS
+        // Use component positions to estimate the room center for consistent scaling
+        const componentCenter = {
+          x: components.reduce((sum, c) => sum + c.origin.x, 0) / components.length,
+          y: components.reduce((sum, c) => sum + c.origin.y, 0) / components.length
+        };
+        console.log(`📐 Estimated room center from components: (${componentCenter.x.toFixed(1)}, ${componentCenter.y.toFixed(1)})`);
+
         for (const component of components) {
-          const key = component.assets[0].asset.models[0].high_res_model_path.replace(/\/([^\/]+)$/, '/glb/$1')
+          console.log('Processing component:', component.sparxAssetId);
+          console.log('Component full details:', component);
+          
+          const assets = component.assets
+          const key = assets[0].models[0].high_res_model_path
+          console.log('Key:', key);
+          const filename = '/glb/' + key.split('/').pop() + '.glb'  // Yes, .pop() gets 'ccc' from 'aaa/bbb/ccc'
+          console.log('Generated filename:', filename);
 
-          generatePresignedUrl(`${key}.glb`).then(data => {
-            console.log("link", data)
-
-            var loader = new THREE.GLTFLoader();
-
-            // Load the GLB file - this will now actually parse the GLB format!
-            loader.load(data, function (gltf) {
-              console.log('GLB model loaded successfully with real parser!', gltf);
-
-              var model = gltf.scene;
-
-              // Debug: Check the actual model contents
-              console.log('Model children count:', model.children.length);
-              console.log('Model visible:', model.visible);
-              console.log('Model bounding box:', model);
-
-              // Enhanced texture and material handling for GLB models
-              model.traverse(function (child) {
-                if (child.isMesh) {
-                  console.log('Processing mesh:', child.name, child.material);
-                  
-                  // Handle materials and textures properly
-                  if (child.material) {
-                    // If it's an array of materials
-                    if (Array.isArray(child.material)) {
-                      child.material.forEach(material => {
-                        fixMaterialTextures(material);
-                      });
-                    } else {
-                      // Single material
-                      fixMaterialTextures(child.material);
-                    }
-                  }
-                  
-                  // Ensure proper rendering settings
-                  child.castShadow = true;
-                  child.receiveShadow = true;
-                }
-              });
-
-              // Function to fix material textures and encoding
-              function fixMaterialTextures(material) {
-                if (!material) return;
-                
-                // Set proper texture encoding for color textures
-                if (material.map) {
-                  material.map.encoding = THREE.sRGBEncoding;
-                  material.map.flipY = false; // GLB textures don't need flipping
-                }
-                
-                if (material.emissiveMap) {
-                  material.emissiveMap.encoding = THREE.sRGBEncoding;
-                  material.emissiveMap.flipY = false;
-                }
-                
-                // Keep data textures (non-color) in linear encoding
-                if (material.normalMap) {
-                  material.normalMap.encoding = THREE.LinearEncoding;
-                  material.normalMap.flipY = false;
-                }
-                
-                if (material.roughnessMap) {
-                  material.roughnessMap.encoding = THREE.LinearEncoding;
-                  material.roughnessMap.flipY = false;
-                }
-                
-                if (material.metalnessMap) {
-                  material.metalnessMap.encoding = THREE.LinearEncoding;
-                  material.metalnessMap.flipY = false;
-                }
-                
-                if (material.aoMap) {
-                  material.aoMap.encoding = THREE.LinearEncoding;
-                  material.aoMap.flipY = false;
-                }
-                
-                // Ensure material updates
-                material.needsUpdate = true;
-                
-                console.log('Fixed material textures for:', material.name || 'unnamed material');
-              }
-
-              // Calculate normalized vectors
-              const origin = new THREE.Vector3(component.origin.x, component.origin.z, component.origin.y + 0.01);
-
-              const topPoint = new THREE.Vector3(component.top.x, component.top.z, component.top.y + 0.01);
-              const topVec = new THREE.Vector3().subVectors(topPoint, origin).normalize();
-
-              const frontPoint = new THREE.Vector3(component.front.x, component.front.z, component.front.y + 0.01);
-              const frontVec = new THREE.Vector3().subVectors(frontPoint, origin).normalize();
-              frontVec.negate(); // Negate to match Swift implementation
-
-              // Calculate right vector as cross product of top and front
-              const rightVec = new THREE.Vector3().crossVectors(topVec, frontVec);
-
-              // Create rotation matrix from orthonormal vectors
-              const rotMatrix = new THREE.Matrix4().makeBasis(rightVec, topVec, frontVec);
-              const quaternion = new THREE.Quaternion().setFromRotationMatrix(rotMatrix);
-
-              // Set position and rotation
-              model.position.copy(origin);
-              model.position.multiplyScalar(100); // Scale position
-              model.quaternion.copy(quaternion);
-
-              // Apply scale if present
-              const scale = component.scale || { x: 1, y: 1, z: 1 };
-              model.scale.set(scale.x, scale.y, scale.z); // Keep original scale order
-
-              // Ensure model visibility
-              model.visible = true;
-
-              // Add to the correct blueprint3d scene
-              console.log('Adding real GLB model to blueprint3d.model.scene...');
-              blueprint3d.model.scene.add(model);
-
-              console.log('Real GLB model loaded and positioned at:', model.position);
-              console.log('Scene now contains actual parsed GLB geometry!');
-
-            }, function (progress) {
-              console.log('Loading progress:', (progress.loaded / progress.total * 100) + '%');
-            }, function (error) {
-              console.error('Error loading GLB model:', error);
-            });
-
-
-          })
+          loader.load(filename, function (gltf) {
+            console.log('LOCAL GLB model loaded successfully!', gltf);
+      
+            var model = gltf.scene;
+            positionModel(model, component, key, componentCenter);
+            // Debug: Check the actual model contents
+            console.log('Model children count:', model.children.length);
+            console.log('Model visible:', model.visible);
+      
+            // Position the model in the scene
+            // model.position.set(0, 0, 50); // Adjust position as needed
+            // model.scale.set(10, 10, 10);  // Scale up if too small
+            // model.visible = true;
+      
+            // Add to the blueprint3d scene
+            console.log('Adding LOCAL GLB model to blueprint3d.model.scene...');
+            blueprint3d.model.scene.add(model);
+      
+            console.log('LOCAL GLB model loaded and positioned at:', model.position);
+            console.log('Scene now contains local GLB geometry - no CORS errors!');
+      
+          }, function (progress) {
+            console.log('Loading progress:', (progress.loaded / progress.total * 100) + '%');
+          }, function (error) {
+            console.error('Error loading LOCAL GLB model:', error);
+          });
         }
-
-        // generatePresignedUrl("new_models/cb2/glb/luca_Spider_marble_side_table_white.glb").then(data=>{
-        //   console.log("link", data)
-        //   console.log("link", data)
-        // })
       })
       .catch(error => {
         console.error('Error loading designs:', error);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
       });
-
-
-
-  }, 1000); // Wait for scene initialization
+  }
 });

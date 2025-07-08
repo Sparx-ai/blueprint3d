@@ -6,9 +6,29 @@
     <link href="css/bootstrap.css" rel="stylesheet">
     <link href="css/example.css" rel="stylesheet">
 
-    <script src="js/three.min.js"></script>
-    <script src="js/GLTFLoader.js"></script>
-    <script src="js/blueprint3d.js"></script>
+    <!-- ANTI-CACHE: Unique timestamp prevents browser caching -->
+    <script src="js/three.min.js?v=r100-1725816847"></script>
+    <script src="js/GLTFLoader.js?v=r100-1725816847"></script>
+    <script src="js/blueprint3d.js?v=r100-1725816847"></script>
+    
+    <!-- Version Check Script -->
+    <script>
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          if (typeof THREE !== 'undefined') {
+            console.log('✅ Three.js Version:', THREE.REVISION);
+            if (THREE.REVISION !== "100") {
+              console.error('❌ WRONG VERSION! Expected: 100, Got:', THREE.REVISION);
+              alert('WARNING: Three.js version mismatch! Expected r100, got r' + THREE.REVISION);
+            } else {
+              console.log('✅ Three.js r100 loaded successfully!');
+            }
+          } else {
+            console.error('❌ THREE.js not loaded!');
+          }
+        }, 100);
+      });
+    </script>
 
     <script src="js/jquery.js"></script>
     <script src="js/bootstrap.js"></script>

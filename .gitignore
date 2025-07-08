@@ -10,5 +10,6 @@ build
 bin
 doc
 dist
-example/js/blueprint3d.js
-example/js/three.min.js
+# Removing these so updated Three.js r100 can be committed
+# example/js/blueprint3d.js
+# example/js/three.min.js
