@@ -1,4 +1,4 @@
-{
+[{
     "room_id": 3,
     "boundaries": [
       {
@@ -440,4 +440,4 @@
       }
     ],
     "classification": "Bedroom"
-  }
+  }]

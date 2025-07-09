@@ -1,25 +1,4 @@
-// 🎯 SHARED BACKEND SCALE FACTOR
-// Backend: pixels_to_meters_ratio = 34.44444444444444
-// This means: 1 pixel = 2.903 cm
-const PIXELS_TO_METERS_RATIO = 34.44444444444444;
-const CM_PER_PIXEL = (1 / PIXELS_TO_METERS_RATIO) * 100; // 2.903 cm per pixel
-
-// 🎯 BACKEND COORDINATE CONVERSION  
-// Using same shared scale factor as room vertices for perfect consistency
-// GLB models: in centimeters → convert to pixels using backend ratio
-// Conversion: cm to pixels = cm ÷ CM_PER_PIXEL
-
-const glbToBlueprintScale = 1; // Convert cm to pixels (0.344444)
-
-// 🎯 STEP 2: Scale vertices around center
-function scaleAroundCenter(vertex, center, scaleFactor) {
-  return {
-    x: center.x + (vertex.x - center.x) * scaleFactor,
-    y: center.y + (vertex.y - center.y) * scaleFactor
-  };
-}
-
-function convertStructureToBlueprint(rooms, scaleFactor = 1, mergeThreshold = 0.1) {
+function convertStructureToBlueprint(rooms, mergeThreshold = 0.1) {
   const coordToUUID = {};  // "x,y" => UUID
   const uuidToCoord = {};  // UUID => { x, y }
   const wallSet = new Set();
@@ -58,35 +37,13 @@ function convertStructureToBlueprint(rooms, scaleFactor = 1, mergeThreshold = 0.
     }
     return uuid;
   }
-
-  // Using shared backend coordinate conversion factor
-  
-  // 🎯 STEP 1: Calculate center of all vertices BEFORE scaling
-  const allVertices = [];
-  const roomsArray = Array.isArray(rooms) ? rooms : [rooms];
-  
-  // Collect all unique vertices
-  for (const room of roomsArray) {
-    for (const boundary of room.boundaries) {
-      allVertices.push(boundary.vertex1, boundary.vertex2);
-    }
-  }
-  
-  // Find center (centroid)
-  const center = {
-    x: allVertices.reduce((sum, v) => sum + v.x, 0) / allVertices.length,
-    y: allVertices.reduce((sum, v) => sum + v.y, 0) / allVertices.length
-  };
-  
-  console.log(`🎯 Original center: (${center.x.toFixed(1)}, ${center.y.toFixed(1)})`);
-  console.log(`📏 Scale factor: ${CM_PER_PIXEL.toFixed(3)} cm per pixel`);
   
   // Process room boundaries as walls
-  for (const room of roomsArray) {
+  for (const room of rooms) {
     for (const boundary of room.boundaries) {
       // Scale vertices around center (preserves room position)
-      const scaledVertex1 = scaleAroundCenter(boundary.vertex1, center, CM_PER_PIXEL);
-      const scaledVertex2 = scaleAroundCenter(boundary.vertex2, center, CM_PER_PIXEL);
+      const scaledVertex1 = boundary.vertex1
+      const scaledVertex2 = boundary.vertex2
 
       const uuid1 = processVertex(scaledVertex1);
       const uuid2 = processVertex(scaledVertex2);
@@ -125,24 +82,6 @@ function convertStructureToBlueprint(rooms, scaleFactor = 1, mergeThreshold = 0.
   for (const uuid of usedCorners) {
     filteredCorners[uuid] = uuidToCoord[uuid];
   }
-
-  // 🎯 STEP 3: Verify center preservation
-  const scaledVertices = [];
-  for (const room of roomsArray) {
-    for (const boundary of room.boundaries) {
-      const scaledVertex1 = scaleAroundCenter(boundary.vertex1, center, CM_PER_PIXEL);
-      const scaledVertex2 = scaleAroundCenter(boundary.vertex2, center, CM_PER_PIXEL);
-      scaledVertices.push(scaledVertex1, scaledVertex2);
-    }
-  }
-  
-  const newCenter = {
-    x: scaledVertices.reduce((sum, v) => sum + v.x, 0) / scaledVertices.length,
-    y: scaledVertices.reduce((sum, v) => sum + v.y, 0) / scaledVertices.length
-  };
-  
-  console.log(`✅ Scaled center: (${newCenter.x.toFixed(1)}, ${newCenter.y.toFixed(1)})`);
-  console.log(`📏 Center preserved: ${Math.abs(newCenter.x - center.x) < 0.01 && Math.abs(newCenter.y - center.y) < 0.01 ? 'YES' : 'NO'}`);
 
   return {
     floorplan: {
@@ -813,8 +752,8 @@ $(document).ready(function () {
       }
 
       // Position the model in the scene
-      model.position.set(0, 0, 50); // Adjust position as needed
-      model.scale.set(10, 10, 10);  // Scale up if too small
+      // model.position.set(0, 0, 50); // Adjust position as needed
+      // model.scale.set(10, 10, 10);  // Scale up if too small
       model.visible = true;
 
       // Add to the blueprint3d scene
@@ -874,33 +813,15 @@ $(document).ready(function () {
 
       // 🎯 CENTER-PRESERVING MODEL POSITIONING
       // Apply the same scaling transformation as room boundaries
-      // Use the same scaleAroundCenter function with calculated room center
-      
-      // Use the room center calculated from component positions
-      const useRoomCenter = roomCenter || { x: 0, y: 0 }; // Fallback to origin if not provided
-      
-      // Apply center-preserving scaling to model position (X-Z plane)
-      const scaledPos2D = scaleAroundCenter(
-        { x: component.origin.x, y: component.origin.y }, 
-        useRoomCenter, 
-        CM_PER_PIXEL
-      );
-      
-      const scaledOrigin = new THREE.Vector3(
-        scaledPos2D.x,
-        component.origin.z * CM_PER_PIXEL, // Y coordinate (height) - simple scaling
-        scaledPos2D.y
-      );
       
       console.log(`📍 Model positioning for ${name}:`, {
         originalPos: {x: component.origin.x.toFixed(1), y: component.origin.y.toFixed(1), z: component.origin.z.toFixed(1)},
-        scaledPos: {x: scaledOrigin.x.toFixed(1), y: scaledOrigin.y.toFixed(1), z: scaledOrigin.z.toFixed(1)},
-        roomCenter: useRoomCenter,
-        scaleFactor: CM_PER_PIXEL.toFixed(3)
+        scaledPos: {x: origin.x.toFixed(1), y: origin.y.toFixed(1), z: origin.z.toFixed(1)},
+        roomCenter: roomCenter
       });
       
       // Set position and rotation
-      model.position.copy(scaledOrigin);
+      model.position.copy(origin);
       model.quaternion.copy(quaternion);
       
       // Debug: Log rotation vectors
@@ -927,16 +848,9 @@ $(document).ready(function () {
         scale: component.scale || { x: 1, y: 1, z: 1 }
       });
       // Apply component scale factor
-      const componentScale = component.scale || { x: 1, y: 1, z: 1 };
-      
-      // 📏 PRECISE SCALING CALCULATION
-      const finalScale = {
-        x: componentScale.x * glbToBlueprintScale,
-        y: componentScale.y * glbToBlueprintScale, 
-        z: componentScale.z * glbToBlueprintScale
-      };
-      
-      model.scale.set(finalScale.x, finalScale.y, finalScale.z);
+      // const componentScale = component.scale || { x: 1, y: 1, z: 1 };
+    
+      model.scale.set(component.scale.x, component.scale.y, component.scale.z);
       
       // Get final size after scaling  
       const scaledBox = new THREE.Box3().setFromObject(model);
@@ -945,13 +859,9 @@ $(document).ready(function () {
       console.log('📊 BACKEND SCALING (CONSISTENT WITH ROOM SCALING):', {
         assetId: component.sparxAssetId,
         originalSize_cm: {x: size2.x.toFixed(1), y: size2.y.toFixed(1), z: size2.z.toFixed(1)},
-        sharedBackendRatio: `${PIXELS_TO_METERS_RATIO} pixels/meter`,
-        pixelPerCm: `1 pixel = ${CM_PER_PIXEL.toFixed(3)} cm`,
-        conversionFactor: `1 cm = ${glbToBlueprintScale.toFixed(6)} pixels`,
-        componentScale: componentScale,
-        finalScale: {x: finalScale.x.toFixed(6), y: finalScale.y.toFixed(6), z: finalScale.z.toFixed(6)},
-        finalSize_pixels: {x: finalSize.x.toFixed(1), y: finalSize.y.toFixed(1), z: finalSize.z.toFixed(1)},
-        finalSize_cm: {x: (finalSize.x * CM_PER_PIXEL).toFixed(1), y: (finalSize.y * CM_PER_PIXEL).toFixed(1), z: (finalSize.z * CM_PER_PIXEL).toFixed(1)}
+        componentScale: component.scale,
+        finalScale: {x: component.scale.x.toFixed(6), y: component.scale.y.toFixed(6), z: component.scale.z.toFixed(6)},
+        finalSize_cm: {x: (finalSize.x).toFixed(1), y: (finalSize.y).toFixed(1), z: (finalSize.z).toFixed(1)}
       });
   }
 
@@ -989,6 +899,7 @@ $(document).ready(function () {
           console.log('Component full details:', component);
           
           const assets = component.assets
+          console.log('Assets:', assets);
           const key = assets[0].models[0].high_res_model_path
           console.log('Key:', key);
           const filename = '/glb/' + key.split('/').pop() + '.glb'  // Yes, .pop() gets 'ccc' from 'aaa/bbb/ccc'

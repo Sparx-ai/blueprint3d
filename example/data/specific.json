@@ -12,36 +12,36 @@
               },
               "design_components": [
                 {
-                  "sparxAssetId": "bed_queen_01",
+                  "sparxAssetId": "bed_queen_1",
                   "sparxCategory": "Asset",
                   "isOcclusion": false,
                   "hideable": false,
-                  "id": 149227,
+                  "id": 77480,
                   "scale": {
-                    "x": 1,
-                    "y": 1,
-                    "z": 1
+                    "x": 0.230656256397855,
+                    "y": 0.230656256397855,
+                    "z": 0.230656256397855
                   },
                   "origin": {
-                    "x": 165.5,
-                    "y": 178.5,
-                    "z": 10.0
+                    "x": 166.7506235361001,
+                    "y": 181.81201736665886,
+                    "z": 10.326514140102065
                   },
                   "front": {
-                    "x": 34.75,
-                    "y": -30.75,
-                    "z": 10.0
+                    "x": 166.7506235361001,
+                    "y": 180.81201736665886,
+                    "z": 10.326514140102065
                   },
                   "top": {
-                    "x": 165.5,
-                    "y": 178.5,
-                    "z": 30.0
+                    "x": 166.7506235361001,
+                    "y": 181.81201736665886,
+                    "z": 20.65302828020413
                   },
                   "assets": [
                     {
                       "models": [
                         {
-                          "high_res_model_path": "new_models/cb2/glb/facade_queen_bed_lindy_snow",
+                          "high_res_model_path": "new_models/crate_and_barrel/glb/facade_queen_bed_lindy_snow",
                           "model_type": "glb"
                         }
                       ],
@@ -51,43 +51,135 @@
                       }
                     }
                   ],
-                  "depth": 39.0,
-                  "width": 31.0,
-                  "height": 20.0,
+                  "depth": 50.0,
+                  "width": 40.0,
+                  "height": 50.0,
                   "baseType": "Floor-Based",
-                  "componentId": 149227
+                  "componentId": 77480
                 },
                 {
-                  "sparxAssetId": "dresser_01",
+                  "sparxAssetId": "nightstand_left_1",
                   "sparxCategory": "Asset",
                   "isOcclusion": false,
                   "hideable": false,
-                  "id": 820528,
+                  "id": 853679,
+                  "scale": {
+                    "x": 0.2001633795101692,
+                    "y": 0.2001633795101692,
+                    "z": 0.2001633795101692
+                  },
+                  "origin": {
+                    "x": 195.00095811314816,
+                    "y": 191.7725481964653,
+                    "z": 5.486997424464847
+                  },
+                  "front": {
+                    "x": 195.00095811314816,
+                    "y": 190.7725481964653,
+                    "z": 5.486997424464847
+                  },
+                  "top": {
+                    "x": 195.00095811314816,
+                    "y": 191.7725481964653,
+                    "z": 10.973994848929694
+                  },
+                  "assets": [
+                    {
+                      "models": [
+                        {
+                          "high_res_model_path": "new_models/cb2/glb/archer_laquered_linen_nightnstand",
+                          "model_type": "glb"
+                        }
+                      ],
+                      "category": {
+                        "id": 136,
+                        "name": "nightstands"
+                      }
+                    }
+                  ],
+                  "depth": 10.0,
+                  "width": 15.0,
+                  "height": 60.0,
+                  "baseType": "Floor-Based",
+                  "componentId": 853679
+                },
+                {
+                  "sparxAssetId": "nightstand_right_1",
+                  "sparxCategory": "Asset",
+                  "isOcclusion": false,
+                  "hideable": false,
+                  "id": 662990,
                   "scale": {
                     "x": 1,
                     "y": 1,
                     "z": 1
                   },
                   "origin": {
-                    "x": 165.5,
-                    "y": 97.0,
-                    "z": 11.0
+                    "x": 194.5,
+                    "y": 193.0,
+                    "z": 30.0
                   },
                   "front": {
-                    "x": 34.75,
-                    "y": 50.75,
-                    "z": 11.0
+                    "x": 5.75,
+                    "y": -45.25,
+                    "z": 30.0
                   },
                   "top": {
-                    "x": 165.5,
-                    "y": 97.0,
-                    "z": 33.0
+                    "x": 194.5,
+                    "y": 193.0,
+                    "z": 90.0
                   },
                   "assets": [
                     {
                       "models": [
                         {
-                          "high_res_model_path": "new_models/crate_and_barrel/glb/archer_lacquered_linen_low_dresser",
+                          "high_res_model_path": "new_models/cb2/glb/archer_laquered_linen_nightnstand",
+                          "model_type": "glb"
+                        }
+                      ],
+                      "category": {
+                        "id": 136,
+                        "name": "nightstands"
+                      }
+                    }
+                  ],
+                  "depth": 10.0,
+                  "width": 15.0,
+                  "height": 60.0,
+                  "baseType": "Floor-Based",
+                  "componentId": 662990
+                },
+                {
+                  "sparxAssetId": "dresser_1",
+                  "sparxCategory": "Asset",
+                  "isOcclusion": false,
+                  "hideable": false,
+                  "id": 119854,
+                  "scale": {
+                    "x": 0.19946803249025502,
+                    "y": 0.19946803249025502,
+                    "z": 0.19946803249025502
+                  },
+                  "origin": {
+                    "x": 166.99961555644762,
+                    "y": 100.27460881725571,
+                    "z": 4.763493524198008
+                  },
+                  "front": {
+                    "x": 166.99961555644762,
+                    "y": 101.27460881725571,
+                    "z": 4.763493524198008
+                  },
+                  "top": {
+                    "x": 166.99961555644762,
+                    "y": 100.27460881725571,
+                    "z": 9.526987048396016
+                  },
+                  "assets": [
+                    {
+                      "models": [
+                        {
+                          "high_res_model_path": "new_models/cb2/glb/archer_lacquered_linen_low_dresser",
                           "model_type": "glb"
                         }
                       ],
@@ -97,11 +189,11 @@
                       }
                     }
                   ],
-                  "depth": 10.0,
-                  "width": 23.0,
-                  "height": 22.0,
+                  "depth": 15.0,
+                  "width": 30.0,
+                  "height": 90.0,
                   "baseType": "Floor-Based",
-                  "componentId": 820528
+                  "componentId": 119854
                 }
               ]
             }
